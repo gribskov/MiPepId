@@ -13,7 +13,7 @@ def MiPepid(input_fname, output_fname):
   print('Begin writing the output file: ' + output_fname)
 
   # load the model
-  logr, threshold = ML.load_model()
+  logr, threshold = ML.load_model(model_fname='model/model.pkl')
 
   # gather all the sORFs and write
   all_sORFs = []
