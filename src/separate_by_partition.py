@@ -21,6 +21,7 @@ def read_features(fname, ptype, partition):
 # Main
 # --------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
+    threshold = 0.6
     data = 'datasets/'
     # partition[test/train][label] = []
     partition = {'train': [[], []],
@@ -30,7 +31,7 @@ if __name__ == '__main__':
 
     # read training sequence IDs from training_feature.csv
     # column 256 and 257 are ORF_ID and label (1/0) respectively
-    train = []
+    # training = []
     train_in = open(data + 'train_feature.csv', 'r')
     header = train_in.readline()
     for line in train_in:
@@ -38,13 +39,53 @@ if __name__ == '__main__':
         orf = field[256]
         label = field[257]
         print(f'{label}\t{orf}')
+        partition[train][int(label)].append(orf)
+
+    train_in.close()
+    
+    # read test sequence IDs from test_feature.csv
+    # testing = []
+    test_in = open(data + 'test_feature.csv', 'r')
+    header = test_in.readline()
+    for line in test_in:
+        field = line.rstrip().split(',')
+        orf = field[256]
+        label = field[257]
+        print(f'{label}\t{orf}')
         partition[test][int(label)].append(orf)
 
-    # read test sequence IDs from test_feature.csv
-    test = []
+    test_in.close()
+
+    print(f'\npartition\tpositive\tnegative')
+    print(f'training\t{len(partition[train][1]):8d}\t{len(partition[train][0]):8d}')
+    print(f'test    \t{len(partition[test][1]):8d}\t{len(partition[test][0]):8d}')
+    print(f'total   \t{len(partition[test][1])+len(partition[train][1]):8d}\t{len(partition[test][0])+len(partition[train][0]):8d}')
+
+    # make an index of all sequences
+    idx = {}
+    for part in partition:
+        for posneg in (0,1):
+            for seq in partition[part][posneg]:
+                idx[seq] = [part, posneg]
+
 
     # partition positive results into training/test partition
+    # sORF_ID, sORF_seq, transcript_DNA_sequence_ID, start_at, end_at, classification, probability
+    pos = open('positive_results.csv', 'r')
+    header = pos.readline()
+    for line in pos:
+        field = line.rstrip().split(',')
+        orf = field[0]
+        classid = field[5]
+        p = float(field[6])
+        call = 'noncoding'
+        if p > threshold:
+            call = 'coding'
+        if orf in idx:
+            idx[orf].append(classid, call, p)
+        else:
+            print(f'{orf} is missing')
 
-    # partition negative results into training/text and by biotype
+    # partition negative results into training/test and by biotype
 
     exit(0)
