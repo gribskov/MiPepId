@@ -73,19 +73,32 @@ if __name__ == '__main__':
     # sORF_ID, sORF_seq, transcript_DNA_sequence_ID, start_at, end_at, classification, probability
     pos = open('positive_results.csv', 'r')
     header = pos.readline()
+    missing = 0
     for line in pos:
         field = line.rstrip().split(',')
-        orf = field[0]
+        orig_orf = orf
+        orf = field[0].replace('ORF', 'ORF0')
         classid = field[5]
         p = float(field[6])
         call = 'noncoding'
         if p > threshold:
             call = 'coding'
         if orf in idx:
-            idx[orf].append(classid, call, p)
+            idx[orf] += [orig_orf, classid, call, p]
         else:
-            print(f'{orf} is missing')
+            cut = orf.index('_')
+            orig_orf = orf
+            orf = orf[:cut]
+            if orf in idx:
+                idx[orf] += [orig_orf, classid, call, p]
+            else:
+                missing += 1
+                print(f'{missing}\t{orf} is missingclass={classid}, p={p}')
 
     # partition negative results into training/test and by biotype
 
+    n = 0
+    for id in idx:
+        n += 1
+        print(f'{n}\t{id}\t{idx[id]}')
     exit(0)
