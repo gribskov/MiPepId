@@ -21,6 +21,7 @@ def write_data(file, df):
     ---------------------------------------------------------------------------------------------"""
     nseq = 0
     nrow = 0
+    file.write('orfID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,EnsemblTranscriptID,transcriptBiotype,transcriptDNAseq,EnsemblGeneID,geneBiotype\n')
     for index, row in df.iterrows():
         nseq += 1
         norf = 0
