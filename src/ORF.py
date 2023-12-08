@@ -131,3 +131,33 @@ def collect_and_name_sORFs_from_an_ORFs_object(obj_ORFs, transcript_seq_ID):
             sORFs.append(this_sORF)
 
     return sORFs
+
+
+def get_orfs_simple(sequence, start=['ATG'], stop=['TAA', 'TAG', 'TGA']):
+    """---------------------------------------------------------------------------------------------
+    return a non-overlapping list of orfs beginning with any codon in start and ending with one of
+    the infram stop codons in stop
+
+    :param sequence:    string with complete sequence
+    :param start:       list of start codons, e.g. ['ATG']
+    :param stop:        list of stop codons, e.g. ['TAA', 'TAG', 'TGA']
+    :return:            list of [ORF_string, begin, end]
+    ---------------------------------------------------------------------------------------------"""
+    rflist = []
+    open = [False, False, False]
+    for pos in range(len(sequence)):
+        frame = pos % 3
+        if sequence[pos:pos + 3] in start:
+            # start codon
+            if not open[frame]:
+                # no current working orf in this frame, start a new one
+                open[frame] = pos
+
+        elif sequence[pos:pos + 3] in stop:
+            # stop codon
+            if open[frame]:
+                # there is a current orf in this frame, save and close
+                rflist.append([sequence[open[frame]:pos + 3], open[frame], pos])
+                open[frame] = False
+
+    return rflist
