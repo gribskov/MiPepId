@@ -1,6 +1,6 @@
 """=================================================================================================
-data in the negative_original_data.csv and positive_original_data.csv files contain some overlapping
-orfs. Regenerate the data from the source DNA sequences in the file.
+data in the negative_original_data.csv and file contains some overlapping
+orfs. Regenerate the data from the source transcript DNA sequences in the file.
 
 Michael Gribskov     07 December 2023
 ================================================================================================="""
@@ -57,7 +57,7 @@ def write_fa(file, df):
     nseq = 0
     for index, row in df.iterrows():
         nseq += 1
-        file.write(f'>{df["orfID"]}\n{df["DNAseq"]}\n')
+        file.write(f'>{row["orfID"]}\n{row["DNAseq"]}\n')
 
     return nseq
 
@@ -77,8 +77,10 @@ if __name__ == '__main__':
     nrow = write_data(out, orf01)
     out.close()
     print(f'{nrow} rows written to {sys.argv[2]}')
-    fa_out = open(sys.argv[2] + '.fa', 'w')
 
-
+    faname = sys.argv[2] + '.fa'
+    fa_out = open(faname, 'w')
+    nrows = write_fa(fa_out, orf01)
+    print(f'{nrow} rows written to {faname}')
 
     exit(0)
