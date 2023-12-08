@@ -45,6 +45,20 @@ def write_data(file, df):
 
     return nrow
 
+def write_fa(file, df):
+    """---------------------------------------------------------------------------------------------
+    Write the orf out in fasta format
+
+    :param file: filehandle open for reading
+    :param df:   dataframe with sorf data
+    :return:     number of sequences written
+    ---------------------------------------------------------------------------------------------"""
+    nseq = 0
+    for index, row in df.iterrows():
+        nseq += 1
+        file.write(f'>{df["orfID"]}\n{df["DNAseq"]}\n')
+
+    return nseq
 
 # --------------------------------------------------------------------------------------------------
 # main program
@@ -62,5 +76,8 @@ if __name__ == '__main__':
     nrow = write_data(out, orf01)
     out.close()
     print(f'{nrow} rows written to {sys.argv[2]}')
+    fa_out = open(sys.argv[2] + '.fa', 'w')
+
+
 
     exit(0)
