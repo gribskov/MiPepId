@@ -40,6 +40,25 @@ class ORFs:
                             obj = ORF(seq, start_codon_site, stop_codon_site)
                             self.all_ORFs.append(obj)
 
+    def get_orfs_original(self):
+        """-----------------------------------------------------------------------------------------
+        Mengmengs original code for getting the Start-Stop ORFs in the sequence. Originally placed
+        in __init__()
+        -----------------------------------------------------------------------------------------"""
+        for i in range(3):  # the 3 frames
+            fragment_regions = self.__break_sequence_into_fragments_by_stopCodon__(i)
+
+            if len(fragment_regions) > 0:
+                for fragment_region in fragment_regions:
+                    start_codon_starting_sites = self.__find_the_starting_sites_of_all_startCodons__(fragment_region, S)
+                    if len(start_codon_starting_sites) > 0:
+                        for elm in start_codon_starting_sites:
+                            start_codon_site = i + elm;
+                            stop_codon_site = i + fragment_region[1] - 3
+                            seq = DNA_sequence[start_codon_site:(stop_codon_site + 3)]
+                            obj = ORF(seq, start_codon_site, stop_codon_site)
+                            self.all_ORFs.append(obj)
+
     def get_orfs(self):
         """---------------------------------------------------------------------------------------------
         return a non-overlapping list of orfs beginning with any codon in start and ending with one of
@@ -72,20 +91,19 @@ class ORFs:
 
         return rflist
 
-    def __break_sequence_into_fragments_by_stopCodon__(self, S):
+    def __break_sequence_into_fragments_by_stopCodon__(self, frame):
         """-------------------------------------------------------------------------------------------------------------
         Given a DNA sequence, break this into fragments with each fragment ending with a stop codon and the length of
         the fragment is a multiple of 3. Only the first frame of this DNA sequence is considered.
-
+       mrg: reworked to not copy sequence
         Returns:
           a list of the regions of the fragments. Each region in the list is a tuple consisting of 2 elements: the
           starting site of the fragment (0-based) and the end site of the fragment (1-based), so that the 2 numbers can
           be used directly in Python slicing.
         -------------------------------------------------------------------------------------------------------------"""
-
         stop_codon_starting_sites = []
-        for j in range(0, len(S), 3):
-            if S[j:(j + 3)] in self.candidate_stop_codons:
+        for j in range(frame, len(self.seq)-3, 3):
+            if self.seq[j:j + 3] in self.candidate_stop_codons:
                 stop_codon_starting_sites.append(j)
 
         fragment_regions = []
