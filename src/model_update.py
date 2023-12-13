@@ -1,6 +1,7 @@
 import ML
 import sys
 import pickle
+import numpy as np
 """
 LogisticRegression(C=10000.0, class_weight=None, dual=False,
           fit_intercept=True, intercept_scaling=1, max_iter=100,
@@ -80,7 +81,7 @@ logr = LogisticRegression(C=10000.0, class_weight=None, dual=False,
                           multi_class='ovr', n_jobs=1, penalty='l2', random_state=None,
                           solver='liblinear', tol=0.0001, verbose=0, warm_start=False)
 threshold = 0.6
-logr.coef_ = [[ -5.57759579e+00, -1.05859130e+02, -4.04099724e+01, -4.73003909e+01
+coef = np.array([[ -5.57759579e+00, -1.05859130e+02, -4.04099724e+01, -4.73003909e+01,
    -1.15944023e+01, -1.35499324e+02, -6.96921599e+01, -5.05889625e+01,
     1.06909132e+01, -1.13998582e+02, -4.36024991e+01, -6.08945003e+01,
     3.32641905e+01, -9.52333770e+01, -4.25772483e+01, -4.01171853e+01,
@@ -143,8 +144,13 @@ logr.coef_ = [[ -5.57759579e+00, -1.05859130e+02, -4.04099724e+01, -4.73003909e+
     5.80743102e+01, -5.34346189e+01,  1.43489816e+01, -2.44180727e-01,
     4.13457278e+01, -4.81705250e+01, -5.30251955e+00,  8.11774427e+00,
     4.92675520e+01, -5.87421900e+01,  2.33518040e+01,  4.45204265e+00,
-    4.75086432e+01, -5.84129208e+01, -8.79602240e+00, -3.60929319e+00]]
+    4.75086432e+01, -5.84129208e+01, -8.79602240e+00, -3.60929319e+00]])
 
+# coef.shape = (1,256)
+logr.coef_ = coef
+logr.intercept_ = np.array([3.89456584])
+print(logr.coef_.shape)
+print(logr.coef_)
 save = open('newmodel.sav', 'wb')
 pickle.dump(logr, save)
 pickle.dump(threshold, save)
