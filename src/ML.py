@@ -80,6 +80,7 @@ def load_model(model_fname = './src/model/model.pkl'):
   threshold = pickle.load(f)
   f.close()
   return logr, threshold
+  # return 0, 0
 
 def predict_on_one_batch_and_write(sORFs, logr, threshold, output_fname, k=4):
   class_dic = {
