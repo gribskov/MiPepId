@@ -18,7 +18,8 @@ class ORFs:
     candidate_stop_codon, inclusive. Only the coordinates of the beginning of the start and stop
     codon are stored in the object (Orf.orflist)
     ============================================================================================="""
-    def __init__(self, DNA_sequence,
+
+    def __init__(self, DNA_sequence, id='unknown',
                  candidate_start_codons=['ATG'],
                  candidate_stop_codons=['TAA', 'TAG', 'TGA']):
         """-----------------------------------------------------------------------------------------
@@ -28,6 +29,7 @@ class ORFs:
         :param candidate_stop_codons:
         -----------------------------------------------------------------------------------------"""
         self.seq = DNA_sequence
+        self.id = id
         self.candidate_start_codons = candidate_start_codons
         self.candidate_stop_codons = candidate_stop_codons
         self.orflist = []
@@ -36,6 +38,38 @@ class ORFs:
             self.orflist = self.get_orfs()
             print('')
 
+    def orfseqs(self):
+        """-----------------------------------------------------------------------------------------
+        Return a dict of the sequences with coordinates in object.orflist
+
+        :return: list of string     sequences of orfs
+        -----------------------------------------------------------------------------------------"""
+        rflist = []
+        seq = self.seq
+        for begin, end in self.orflist:
+            rflist.append({'seq': seq[begin: end + 3], 'begin': begin, 'end': end})
+
+        return rflist
+
+    def set(self):
+        """-----------------------------------------------------------------------------------------
+        Return the set of ORFs in orflist, unique names, original name, and start/stop coordinage
+        Coordinates are converted from 0-based to 1-based
+
+        :return: list of ['sORF_ID', 'sORF_seq', 'transcript_DNA_sequence_ID', 'start_at', 'end_at']
+        -----------------------------------------------------------------------------------------"""
+        rflist = []
+        seq = self.seq
+        n_orf = 0
+        for begin, end in self.orflist:
+            n_orf += 1
+            rflist.append([self.id + f'_ORF{n_orf:02d}',
+                           seq[begin: end + 3],
+                           self.id,
+                           begin+1,
+                           end+1]
+                          )
+        return rflist
 
     def get_orfs_original(self):
         """-----------------------------------------------------------------------------------------
@@ -85,7 +119,7 @@ class ORFs:
                 # stop codon
                 if open[frame] > -1:
                     # there is a current orf in this frame, save and close
-                    rflist.append([open[frame], pos+2])
+                    rflist.append([open[frame], pos + 2])
                     open[frame] = -1
 
         return rflist
@@ -94,7 +128,8 @@ class ORFs:
         """-------------------------------------------------------------------------------------------------------------
         Given a DNA sequence, break this into fragments with each fragment ending with a stop codon and the length of
         the fragment is a multiple of 3. Only the first frame of this DNA sequence is considered.
-       mrg: reworked to not copy sequence
+        mrg: reworked to not copy sequence
+
         Returns:
           a list of the regions of the fragments. Each region in the list is a tuple consisting of 2 elements: the
           starting site of the fragment (0-based) and the end site of the fragment (1-based), so that the 2 numbers can
