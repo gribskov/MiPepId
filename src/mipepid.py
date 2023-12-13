@@ -1,4 +1,4 @@
-from ORF import ORFs, collect_and_name_sORFs_from_an_ORFs_object
+from ORF import ORF, ORFs, collect_and_name_sORFs_from_an_ORFs_object
 import ML
 
 from Bio import SeqIO
@@ -61,6 +61,55 @@ class Dataset():
             self.data.append({col[i]: field[i] for i in range(len(col))})
 
         return len(self.data)
+
+    def orf_filter(self, label, constraints):
+        """-----------------------------------------------------------------------------------------
+        return an ORFs object with a list of the ORFs of interest. Constraints can be used to filter
+        the list. Constraints is a dictionary. The keys correspond to the column labels and the
+        values are arrays that specify allowed values. For "DNAlength" the value indicates the
+        minimum acceptable length (including stop codon).
+
+        SmProtID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,
+        transcriptID,corresponding_EnsemblTranscriptIDs,corresponding_transcriptBiotypes,
+        transcriptDNAseq,corresponding_EnsemblGeneIDs,corresponding_geneBiotypes,dataSource,
+        IsHighConfidence
+
+        :param self: object         Dataset
+        :param label: string        should be "positive" or "negative"
+        :param constraints: dict    keys=column labels, values = [] of allowed values
+        :return: object             ORFs (see ORF.py)
+        -----------------------------------------------------------------------------------------"""
+        selected_orfs  = ORFs()
+        if label == "positive":
+            for entry in self.data:
+                seq = entry['DNAseq']
+                orf = ORF(seq, entry['startCodonSite'], entry['stopCodonSite'])
+                orf.start_codon = seq[:3]
+                orf.stop_codon = seq[-3:]
+                if apply_constraints( orf, entry, constraints):
+                    selected_orfs.orflist.append(orf)
+
+        elif label == "negative":
+            for entry in self.data:
+
+        else:
+            sys.stderr.write(f'mipepid:Dataset:orf_filter() - unkown dataset label ({label})')
+
+        return len(orflist)
+
+    @staticmethod
+    def allply_constraints(entry, constraints):
+        """-----------------------------------------------------------------------------------------
+        Returns true if this orf meets all constraints
+
+        :param entry:
+        :param constraints:
+        :return:
+        -----------------------------------------------------------------------------------------"""
+        OK = True
+
+        return OK
+
 
 # End of class Dataset
 
