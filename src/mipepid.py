@@ -136,28 +136,28 @@ class Dataset:
 
 # End of class Dataset
 
-def MiPepid(input_fname, output_fname):
-    """---------------------------------------------------------------------------------------------
-    MiPepid main program
-    Uses Biopython SeqIO to read Fasta sequences from input_fname
-
-    :param input_fname:   string, input file name
-    :param output_fname:  string, output file name
-    :return:
-    ---------------------------------------------------------------------------------------------"""
-    # load the model
-    # logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
-
-    # initialize the output file and write the header
-    columns = ['sORF_ID', 'sORF_seq', 'transcript_DNA_sequence_ID', 'start_at', 'end_at',
-               'classification', 'probability']
-    df = pd.DataFrame(columns=columns)
-    df.to_csv(output_fname, index=False)
-    print('Begin writing the output file: ' + output_fname)
-
-    all_sorfs = []
-    n_predicted = 0
-
+# def MiPepid(input_fname, output_fname):
+#     """---------------------------------------------------------------------------------------------
+#     MiPepid main program
+#     Uses Biopython SeqIO to read Fasta sequences from input_fname
+#
+#     :param input_fname:   string, input file name
+#     :param output_fname:  string, output file name
+#     :return:
+#     ---------------------------------------------------------------------------------------------"""
+#     # load the model
+#     # logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
+#
+#     # initialize the output file and write the header
+#     columns = ['sORF_ID', 'sORF_seq', 'transcript_DNA_sequence_ID', 'start_at', 'end_at',
+#                'classification', 'probability']
+#     df = pd.DataFrame(columns=columns)
+#     df.to_csv(output_fname, index=False)
+#     print('Begin writing the output file: ' + output_fname)
+#
+#     all_sorfs = []
+#     n_predicted = 0
+#
     # for rec in SeqIO.parse(input_fname, 'fasta'):
     #     # each ORF sequence is converted to the set of all possible beginning ATGs are the single stop codon. Why?
     #     # Each one of the stop codons could be a coding RF, not necessarily the longes one
@@ -166,13 +166,13 @@ def MiPepid(input_fname, output_fname):
     #
     #     # Process in batch, each batch >= 1000 ORFs
     #     if len(all_sORFs) > 1000:
-    #         ML.predict_on_one_batch_and_write(all_sORFs, logr, threshold, output_fname)
+    #         ML.batch_predict(all_sORFs, logr, threshold, output_fname)
     #         all_sORFs = []
     #         print(f'Wrote predicted coding/noncoding for {len(all_sORFs)} sORFs')
     #
     # if len(all_sORFs) > 0:
     #     n_predicted += len(all_sORFs)
-    #     ML.predict_on_one_batch_and_write(all_sORFs, logr, threshold, output_fname)
+    #     ML.batch_predict(all_sORFs, logr, threshold, output_fname)
     #     print('Finished writing sORF predictions.')
     #
     # print(f'{n_predicted} sorfs')
@@ -184,17 +184,47 @@ def MiPepid(input_fname, output_fname):
 # main
 # ==================================================================================================
 if __name__ == '__main__':
-    input_fname = output_fname = None
+    batch_size = 999
+    output_fname = 'debug.test.csv'
+    model_fname = 'model/newmodel.sav'
 
     pos = Dataset(sys.argv[1], 'positive')
-    selected_orfs = pos.orf_filter('positive', {})
+    filtered_orfs = pos.orf_filter('positive', {})
     neg = Dataset(sys.argv[2], 'negative')
-    selected_orfs += neg.orf_filter('negative', {'DNAlength': 50})
+    filtered_orfs += neg.orf_filter('negative', {'DNAlength': 50})
 
     # load the model
-    logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
+    logr, threshold = ML.load_model(model_fname=model_fname)
 
+    batch = []
+    n_predicted = 0
+    for s in filtered_orfs:
 
-    MiPepid(input_fname, output_fname)
+        if len(s.pos) > 1:
+            # multiple ORFs
+            n_orf = 0
+            for begin, end in s.pos:
+                n_orf += 1
+                sorf_seq = s.seq[begin:end]
+                sorf_id = s.seqid + f'_ORF{n_orf:02d}'
+                batch.append([sorf_id, sorf_seq, sorf_id, begin, end])
+        else:
+            # just one ORF
+            batch.append([s.seqid, s.seq, s.seqid, s.pos[0][0], s.pos[0][1]])
+
+        # Process in batch, each batch >= batch_size ORFs
+        if len(batch) > batch_size:
+            ML.batch_predict(batch, logr, threshold, output_fname)
+            print(f'\t... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
+            n_predicted += len(batch)
+            batch = []
+
+    if len(batch) > 0:
+        n_predicted += len(batch)
+        ML.batch_predict(batch, logr, threshold, output_fname)
+        n_predicted += len(batch)
+        print(f'\t... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
+
+    print(f'{n_predicted} sORF predictions written to {output_fname}')
 
 exit(0)
