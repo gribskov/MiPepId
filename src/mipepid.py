@@ -1,12 +1,12 @@
-from ORF import ORF, ORFs, collect_and_name_sORFs_from_an_ORFs_object
-import ML
-
-from Bio import SeqIO
-import pandas as pd
 import sys
 
+import pandas as pd
 
-class Dataset():
+import ML
+from ORF import ORF
+
+
+class Dataset:
     """=============================================================================================
     Mengmeng's positive and negative datasets have different fields, so the simplest solution is to
     store them as a dict and use functions to convert them to ORFs for prediction.
@@ -53,9 +53,9 @@ class Dataset():
             sys.stderr.write(f'mipepid.py:read_data() cannot open input file ({filename}')
             exit(1)
 
+        # read the column labels
         col = infile.readline().rstrip().split(',')
 
-        n_read = 0
         for line in infile:
             field = line.rstrip().split(',')
             self.data.append({col[i]: field[i] for i in range(len(col))})
@@ -64,51 +64,74 @@ class Dataset():
 
     def orf_filter(self, label, constraints):
         """-----------------------------------------------------------------------------------------
-        return an ORFs object with a list of the ORFs of interest. Constraints can be used to filter
+        return an list of ORFs object with the ORFs of interest. Constraints can be used to filter
         the list. Constraints is a dictionary. The keys correspond to the column labels and the
         values are arrays that specify allowed values. For "DNAlength" the value indicates the
         minimum acceptable length (including stop codon).
 
-        SmProtID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,
-        transcriptID,corresponding_EnsemblTranscriptIDs,corresponding_transcriptBiotypes,
-        transcriptDNAseq,corresponding_EnsemblGeneIDs,corresponding_geneBiotypes,dataSource,
-        IsHighConfidence
+        positive fields: SmProtID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,
+        stopCodonSite,transcriptID,corresponding_EnsemblTranscriptIDs,
+        corresponding_transcriptBiotypes,transcriptDNAseq,corresponding_EnsemblGeneIDs,
+        corresponding_geneBiotypes,dataSource,IsHighConfidence
+
+        negative fields: orfID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,
+        EnsemblTranscriptID,transcriptBiotype,transcriptDNAseq,EnsemblGeneID,geneBiotype
 
         :param self: object         Dataset
         :param label: string        should be "positive" or "negative"
         :param constraints: dict    keys=column labels, values = [] of allowed values
-        :return: object             ORFs (see ORF.py)
+        :return: list of ORF        selected ORFs (see ORF.py)
         -----------------------------------------------------------------------------------------"""
-        selected_orfs  = ORFs()
+        selected_orfs = []
         if label == "positive":
             for entry in self.data:
-                seq = entry['DNAseq']
-                orf = ORF(seq, entry['startCodonSite'], entry['stopCodonSite'])
-                orf.start_codon = seq[:3]
-                orf.stop_codon = seq[-3:]
-                if apply_constraints( orf, entry, constraints):
-                    selected_orfs.orflist.append(orf)
+                orf = ORF(entry['DNAseq'], seqid=entry['SmProtID'])
+                # DNAlength does not include stop codon
+                orf.pos = [[0, int(entry['stopCodonSite']) - int(entry['startCodonSite']) + 3]]
+                orf.offset = entry['startCodonSite']
+                orf.label = 'positive'
+
+                if self.apply_constraints(entry, constraints):
+                    selected_orfs.append(orf)
 
         elif label == "negative":
             for entry in self.data:
+                # transcriptDNAseq is the complete sequence, we'll re-call the orfs
+                orf = ORF(entry['transcriptDNAseq'], seqid=entry['EnsemblTranscriptID'])
+                # DNAlength includes stop codon
+                orf.pos = [[0, len(orf.seq) - 3]]
+                orf.offset = 0
+                orf.label = 'negative'
+                orf.split_orfs()
+
+                if self.apply_constraints(entry, constraints):
+                    selected_orfs.append(orf)
 
         else:
             sys.stderr.write(f'mipepid:Dataset:orf_filter() - unkown dataset label ({label})')
 
-        return len(orflist)
+        return selected_orfs
 
     @staticmethod
-    def allply_constraints(entry, constraints):
+    def apply_constraints(entry, constraints):
         """-----------------------------------------------------------------------------------------
         Returns true if this orf meets all constraints
 
-        :param entry:
-        :param constraints:
-        :return:
+        :param entry: dict          information describing a sequence entry
+        :param constraints: dict    keys: column titles in entry, values: list of matching terms
+        :return: bool               True if constraints are met
         -----------------------------------------------------------------------------------------"""
-        OK = True
+        ok = True
+        for col in constraints:
+            if col == 'DNAlength':
+                if int(entry['DNAlength']) < constraints[col]:
+                    ok = False
+                    break
+            elif entry[col] not in constraints[col]:
+                ok = False
+                break
 
-        return OK
+        return ok
 
 
 # End of class Dataset
@@ -122,6 +145,9 @@ def MiPepid(input_fname, output_fname):
     :param output_fname:  string, output file name
     :return:
     ---------------------------------------------------------------------------------------------"""
+    # load the model
+    # logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
+
     # initialize the output file and write the header
     columns = ['sORF_ID', 'sORF_seq', 'transcript_DNA_sequence_ID', 'start_at', 'end_at',
                'classification', 'probability']
@@ -129,33 +155,29 @@ def MiPepid(input_fname, output_fname):
     df.to_csv(output_fname, index=False)
     print('Begin writing the output file: ' + output_fname)
 
-    # load the model
-    logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
-
-    # gather all the sORFs and write
-    all_sORFs = []
+    all_sorfs = []
     n_predicted = 0
 
-    for rec in SeqIO.parse(input_fname, 'fasta'):
-        # each ORF sequence is converted to the set of all possible beginning ATGs are the single stop codon. Why?
-        # Each one of the stop codons could be a coding RF, not necessarily the longes one
-        orfs = ORFs(str(rec.seq).upper(), rec.id)
-        all_sORFs += orfs.set()
-
-        # Process in batch, each batch >= 1000 ORFs
-        if len(all_sORFs) > 1000:
-            ML.predict_on_one_batch_and_write(all_sORFs, logr, threshold, output_fname)
-            all_sORFs = []
-            print(f'Wrote predicted coding/noncoding for {len(all_sORFs)} sORFs')
-
-    if len(all_sORFs) > 0:
-        n_predicted += len(all_sORFs)
-        ML.predict_on_one_batch_and_write(all_sORFs, logr, threshold, output_fname)
-        print('Finished writing sORF predictions.')
-
-    print(f'{n_predicted} sorfs')
-
-    return n_predicted
+    # for rec in SeqIO.parse(input_fname, 'fasta'):
+    #     # each ORF sequence is converted to the set of all possible beginning ATGs are the single stop codon. Why?
+    #     # Each one of the stop codons could be a coding RF, not necessarily the longes one
+    #     orfs = ORFs(str(rec.seq).upper(), rec.id)
+    #     all_sORFs += orfs.set()
+    #
+    #     # Process in batch, each batch >= 1000 ORFs
+    #     if len(all_sORFs) > 1000:
+    #         ML.predict_on_one_batch_and_write(all_sORFs, logr, threshold, output_fname)
+    #         all_sORFs = []
+    #         print(f'Wrote predicted coding/noncoding for {len(all_sORFs)} sORFs')
+    #
+    # if len(all_sORFs) > 0:
+    #     n_predicted += len(all_sORFs)
+    #     ML.predict_on_one_batch_and_write(all_sORFs, logr, threshold, output_fname)
+    #     print('Finished writing sORF predictions.')
+    #
+    # print(f'{n_predicted} sorfs')
+    #
+    # return n_predicted
 
 
 # ==================================================================================================
@@ -165,16 +187,14 @@ if __name__ == '__main__':
     input_fname = output_fname = None
 
     pos = Dataset(sys.argv[1], 'positive')
+    selected_orfs = pos.orf_filter('positive', {})
+    neg = Dataset(sys.argv[2], 'negative')
+    selected_orfs += neg.orf_filter('negative', {'DNAlength': 50})
 
-    if len(sys.argv) == 1:
-        print('Please specifiy the input fasta file using the following command:')
-        print('python3 ./src/mipepid.py input_file_name')
-    elif len(sys.argv) == 2:
-        input_fname = sys.argv[1]
-        output_fname = 'Mipepid_results.csv'
-    else:
-        input_fname = sys.argv[1]
-        output_fname = sys.argv[2]
+    # load the model
+    logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
 
-    if input_fname and output_fname:
-        MiPepid(input_fname, output_fname)
+
+    MiPepid(input_fname, output_fname)
+
+exit(0)
