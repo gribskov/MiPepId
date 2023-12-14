@@ -1,6 +1,9 @@
 import numpy as np
 import pickle
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
+
+# pickle.DEFAULT_PROTOCOL = 4
 
 class kmer_featurization:
 
@@ -75,6 +78,7 @@ def predict(logr, X, threshold):
   return y_pred, y_pred_score, y_prob
 
 def load_model(model_fname = './src/model/model.pkl'):
+  from sklearn.linear_model import LogisticRegression
   f = open(model_fname, 'rb')
   logr = pickle.load(f)
   threshold = pickle.load(f)
