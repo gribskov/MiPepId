@@ -162,8 +162,9 @@ def batch_predict(orfs, logr, threshold, output_fname, k=4):
     seqs = df.sORF_seq.tolist()
     obj = KmerFeaturization(k)
     kmer_features = obj.seqlist_to_kmer(seqs, n_occur=False)
-    y_pred, _, y_prob = predict(logr, kmer_features, threshold)
-    df['classification'] = [class_dic[x] for x in list(y_pred)]
+    y_pred, y_pred_score, y_prob = predict(logr, kmer_features, threshold)
+    df['classification'] = [class_dic[x] for x in y_pred]
+    df['score'] = y_pred_score
     df['probability'] = y_prob
     df.to_csv(output_fname, header=True, index=False, mode='a')
 

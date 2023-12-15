@@ -173,7 +173,8 @@ if __name__ == '__main__':
     output_fname = 'debug.test.csv'
     model_fname = 'model/newmodel.sav'
     k = 4
-    filter_len = 20
+    filter_len = 30
+    threshold = 0.75
 
     pos = Dataset(sys.argv[1], 'positive')
     sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
