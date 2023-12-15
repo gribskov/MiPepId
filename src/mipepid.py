@@ -1,6 +1,6 @@
 import sys
 
-import pandas as pd
+# import pandas as pd
 
 import ML
 from ORF import ORF
@@ -136,49 +136,6 @@ class Dataset:
 
 # End of class Dataset
 
-# def MiPepid(input_fname, output_fname):
-#     """---------------------------------------------------------------------------------------------
-#     MiPepid main program
-#     Uses Biopython SeqIO to read Fasta sequences from input_fname
-#
-#     :param input_fname:   string, input file name
-#     :param output_fname:  string, output file name
-#     :return:
-#     ---------------------------------------------------------------------------------------------"""
-#     # load the model
-#     # logr, threshold = ML.load_model(model_fname='model/newmodel.sav')
-#
-#     # initialize the output file and write the header
-#     columns = ['sORF_ID', 'sORF_seq', 'transcript_DNA_sequence_ID', 'start_at', 'end_at',
-#                'classification', 'probability']
-#     df = pd.DataFrame(columns=columns)
-#     df.to_csv(output_fname, index=False)
-#     print('Begin writing the output file: ' + output_fname)
-#
-#     all_sorfs = []
-#     n_predicted = 0
-#
-    # for rec in SeqIO.parse(input_fname, 'fasta'):
-    #     # each ORF sequence is converted to the set of all possible beginning ATGs are the single stop codon. Why?
-    #     # Each one of the stop codons could be a coding RF, not necessarily the longes one
-    #     orfs = ORFs(str(rec.seq).upper(), rec.id)
-    #     all_sORFs += orfs.set()
-    #
-    #     # Process in batch, each batch >= 1000 ORFs
-    #     if len(all_sORFs) > 1000:
-    #         ML.batch_predict(all_sORFs, logr, threshold, output_fname)
-    #         all_sORFs = []
-    #         print(f'Wrote predicted coding/noncoding for {len(all_sORFs)} sORFs')
-    #
-    # if len(all_sORFs) > 0:
-    #     n_predicted += len(all_sORFs)
-    #     ML.batch_predict(all_sORFs, logr, threshold, output_fname)
-    #     print('Finished writing sORF predictions.')
-    #
-    # print(f'{n_predicted} sorfs')
-    #
-    # return n_predicted
-
 
 # ==================================================================================================
 # main
@@ -187,17 +144,29 @@ if __name__ == '__main__':
     batch_size = 999
     output_fname = 'debug.test.csv'
     model_fname = 'model/newmodel.sav'
+    k = 4
+    filter_len = 20
 
     pos = Dataset(sys.argv[1], 'positive')
-    filtered_orfs = pos.orf_filter('positive', {})
+    sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
+    filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
+    n_pos_filt = len(filtered_orfs)
+    sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
+
     neg = Dataset(sys.argv[2], 'negative')
-    filtered_orfs += neg.orf_filter('negative', {'DNAlength': 50})
+    sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
+    filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
+    n_neg_filt = len(filtered_orfs) - n_pos_filt
+    sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
 
     # load the model
+    sys.stderr.write(f'\nLoading regression model from {model_fname}...\n')
     logr, threshold = ML.load_model(model_fname=model_fname)
+    sys.stderr.write(f'... completed loading model\n')
 
     batch = []
     n_predicted = 0
+    sys.stderr.write(f'\nBeginning predictions for {len(filtered_orfs)} sequences\n')
     for s in filtered_orfs:
 
         if len(s.pos) > 1:
@@ -206,6 +175,9 @@ if __name__ == '__main__':
             for begin, end in s.pos:
                 n_orf += 1
                 sorf_seq = s.seq[begin:end]
+                if len(sorf_seq) < k:
+                    # if sequence is less than k, logistic regression fails (no features)
+                    continue
                 sorf_id = s.seqid + f'_ORF{n_orf:02d}'
                 batch.append([sorf_id, sorf_seq, sorf_id, begin, end])
         else:
@@ -215,7 +187,7 @@ if __name__ == '__main__':
         # Process in batch, each batch >= batch_size ORFs
         if len(batch) > batch_size:
             ML.batch_predict(batch, logr, threshold, output_fname)
-            print(f'\t... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
+            print(f'... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
             n_predicted += len(batch)
             batch = []
 
@@ -223,8 +195,8 @@ if __name__ == '__main__':
         n_predicted += len(batch)
         ML.batch_predict(batch, logr, threshold, output_fname)
         n_predicted += len(batch)
-        print(f'\t... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
+        print(f'... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
 
-    print(f'{n_predicted} sORF predictions written to {output_fname}')
+    print(f'\n{n_predicted} sORF predictions written to {output_fname}')
 
 exit(0)
