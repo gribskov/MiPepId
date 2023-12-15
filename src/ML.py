@@ -1,9 +1,12 @@
+import sys
 import numpy as np
 import pickle
 import pandas as pd
+import warnings
 
 
-# from sklearn.linear_model import LogisticRegression
+# from sklearn.exceptions import InconsistentVersionWarning
+# warnings.simplefilter("error", InconsistentVersionWarning)
 
 
 class KmerFeaturization:
@@ -101,22 +104,28 @@ def predict(logr, x, threshold):
     return y_pred, y_pred_score, y_prob
 
 
-def load_model(model_fname='./src/model/model.pkl'):
+def load_model(model_fname='./src/model/model.pkl', no_model_warning=True):
     """---------------------------------------------------------------------------------------------
-    Load the pickled LogisticRegression model. This is unnstable as future version os sklearn may
+    Load the pickled LogisticRegression model. This is unstable as future version os sklearn may
     change the class making the pickled file unreadable. This what happened with the original 
     model.
     
     pickle.DEFAULT_PROTOCOL = 4 seems to work
     
     :param model_fname: string      path to a file with the model
+    :param no_model_warning: bool   if True, warning about model version mismatch is surpressed
     :return: object                 logr
              float                  threshold for prediction
     ---------------------------------------------------------------------------------------------"""
-    # from sklearn.linear_model import LogisticRegression
+    if no_model_warning:
+        # disable sklearn warnings about model mismatch
+        warnings.filterwarnings("ignore")
+
     f = open(model_fname, 'rb')
     logr = pickle.load(f)
     threshold = pickle.load(f)
+    # model_v = logr.__getstate__()['_sklearn_version']
+    # k = logr.__dict__.keys()
     f.close()
 
     return logr, threshold
@@ -131,6 +140,8 @@ def batch_predict(orfs, logr, threshold, output_fname, k=4):
     transcript_DNA_sequence_ID  ID of the original sequence before extracting ORFs
     start_at                    beginning of the orf in the original sequence
     end_at                      end of the orf in the original sequence
+
+    starting and ending positions are converted to 1-based for molecular biologists
     
     :param orfs:
     :param logr: object             LogisticRegression (from load_model)
@@ -144,16 +155,16 @@ def batch_predict(orfs, logr, threshold, output_fname, k=4):
         0: 'noncoding'
     }
 
-    columns = ['sORF_ID', 'sORF_seq', 'transcript_DNA_sequence_ID', 'start_at',
-               'end_at']  # 'start_at' and 'end_at' are both 1-based.
+    # start_at and end_at are both 1-based.
+    columns = ['sORF_ID', 'sORF_seq', 'start_at', 'end_at', 'true_label', 'tags']
     df = pd.DataFrame(orfs, columns=columns)
+
     seqs = df.sORF_seq.tolist()
     obj = KmerFeaturization(k)
-    kmer_features = obj.seqlist_to_kmer(seqs,
-                                        n_occur=False)
+    kmer_features = obj.seqlist_to_kmer(seqs, n_occur=False)
     y_pred, _, y_prob = predict(logr, kmer_features, threshold)
-    df['classification'] = [class_dic[x] for x in y_pred]
+    df['classification'] = [class_dic[x] for x in list(y_pred)]
     df['probability'] = y_prob
-    df.to_csv(output_fname, header=False, index=False, mode='a')
+    df.to_csv(output_fname, header=True, index=False, mode='a')
 
     return df
