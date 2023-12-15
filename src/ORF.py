@@ -8,7 +8,9 @@ class ORF:
 
     def __init__(self, seq, seqid='', start=None, stop=None, split=False):
         """-----------------------------------------------------------------------------------------
-        seq: string             sequence of the region of interest, preferably the entire source 
+        attributes:
+        seq: string             sequence of the region of interest, preferably the
+        entire source
                                 sequence
         id: string              ID of source sequence
         start: list of string   allowed start codons, default is 
@@ -16,8 +18,14 @@ class ORF:
         pos: list of list       [[orf_begin_pos, orf_end_pos], ... ]
         offset: int             offset that would convert internal coordinate to the source 
                                 coordinate
-        #TODO need to add source sequence ID
-        split: bool             if True, the provided region will be split into smaller ORFs 
+        label: string           label, expect 'positive' or 'negative'
+        tag: list of string     additional class tags such as 'high quality' or 'miRNA'
+
+        :param seq: string      populates ORF.seq
+        :param seqid: string    populates ORF.seqid
+        :param start: list      alternative start codon (strings, upper case)
+        :param stop: list       alternative stop codons (strings, upper case)
+        :param split: bool      if True, the provided region will be split into smaller ORFs
         -----------------------------------------------------------------------------------------"""
         self.seq = seq
         self.seqid = ''
@@ -26,6 +34,7 @@ class ORF:
         self.pos = [[0, len(self.seq)]]
         self.offset = 0
         self.label = ''
+        self.tag = []
 
         # override defaults
         if id:
