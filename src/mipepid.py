@@ -1,7 +1,5 @@
 import sys
 
-# import pandas as pd
-
 import ML
 from ORF import ORF
 
@@ -90,6 +88,9 @@ class Dataset:
                 orf.pos = [[0, int(entry['stopCodonSite']) - int(entry['startCodonSite']) + 3]]
                 orf.offset = entry['startCodonSite']
                 orf.label = 'positive'
+                orf.tag = Dataset.to_unique_tag(entry['corresponding_transcriptBiotypes'])
+                if entry['IsHighConfidence'] == 'Yes':
+                    orf.tag.append('HighConfidence')
 
                 if self.apply_constraints(entry, constraints):
                     selected_orfs.append(orf)
@@ -98,10 +99,11 @@ class Dataset:
             for entry in self.data:
                 # transcriptDNAseq is the complete sequence, we'll re-call the orfs
                 orf = ORF(entry['transcriptDNAseq'], seqid=entry['EnsemblTranscriptID'])
-                # DNAlength includes stop codon
+                # DNAlength does not include stop codon
                 orf.pos = [[0, len(orf.seq) - 3]]
                 orf.offset = 0
                 orf.label = 'negative'
+                orf.tag = Dataset.to_unique_tag(entry['transcriptBiotype'])
                 orf.split_orfs()
 
                 if self.apply_constraints(entry, constraints):
@@ -133,8 +135,34 @@ class Dataset:
 
         return ok
 
+    @staticmethod
+    def to_unique_tag(tag, separator=';'):
+        """-----------------------------------------------------------------------------------------
+        Convert s string of multiple tags separated by semicolons to a unique list
+        protein_coding;protein_coding;junk -> ['protein_coding', 'junk']
 
+        :param tag: string      one or more tags, delimited by separator
+        :param separator:       delimiter for fields in string
+        :return: list           unique list of tag strings
+        -----------------------------------------------------------------------------------------"""
+        field = tag.strip().split(separator)
+        tagdict = {}
+        for t in field:
+            try:
+                tagdict[t] += 1
+            except KeyError:
+                tagdict[t] = 1
+
+        taglist = list(tagdict)
+        if not taglist:
+            taglist = []
+
+        return taglist
+
+
+# ===================================================================================================
 # End of class Dataset
+# ===================================================================================================
 
 
 # ==================================================================================================
@@ -169,6 +197,7 @@ if __name__ == '__main__':
     sys.stderr.write(f'\nBeginning predictions for {len(filtered_orfs)} sequences\n')
     for s in filtered_orfs:
 
+        sorf_tag = ';'.join(s.tag)
         if len(s.pos) > 1:
             # multiple ORFs
             n_orf = 0
@@ -179,23 +208,23 @@ if __name__ == '__main__':
                     # if sequence is less than k, logistic regression fails (no features)
                     continue
                 sorf_id = s.seqid + f'_ORF{n_orf:02d}'
-                batch.append([sorf_id, sorf_seq, sorf_id, begin, end])
+                batch.append([sorf_id, sorf_seq, begin, end, s.label, sorf_tag])
         else:
             # just one ORF
-            batch.append([s.seqid, s.seq, s.seqid, s.pos[0][0], s.pos[0][1]])
+            batch.append([s.seqid, s.seq, s.pos[0][0], s.pos[0][1], s.label, sorf_tag])
 
         # Process in batch, each batch >= batch_size ORFs
         if len(batch) > batch_size:
             ML.batch_predict(batch, logr, threshold, output_fname)
-            print(f'... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
             n_predicted += len(batch)
+            print(f'... Predicting coding/noncoding for {len(batch)} sORFs: total={n_predicted}')
             batch = []
 
     if len(batch) > 0:
         n_predicted += len(batch)
         ML.batch_predict(batch, logr, threshold, output_fname)
         n_predicted += len(batch)
-        print(f'... Predicting coding/noncoding for {len(batch)} sORFs/ total={n_predicted}')
+        print(f'... Predicting coding/noncoding for {len(batch)} sORFs: total={n_predicted}')
 
     print(f'\n{n_predicted} sORF predictions written to {output_fname}')
 
