@@ -69,75 +69,49 @@ def print_result():
         print('precision\t{:5.3f}\t{:5.3f}\t{:5.3f}'.format(pp, pn, pa))
 
 
-def precision(df, threshold):
+def stats(df):
     """---------------------------------------------------------------------------------------------
 
     :param df:
-    :param threshold:
-    :return:
+    :return: float, float     precision, recall
     ---------------------------------------------------------------------------------------------"""
-
-
-def filter_length(df):
-    """---------------------------------------------------------------------------------------------
-
-    :param df:
-    :return:
-    ---------------------------------------------------------------------------------------------"""
-
-
-# ===================================================================================================
-# Main
-# ==================================================================================================
-if __name__ == '__main__':
-    threshold = 0.75
-    lengths = [0, 110, 10]
-    print(f'Probability threshold: {threshold}')
-    print(f'Lengths: {lengths[0]} to {lengths[1]} by {lengths[2]}')
-
-    # read the mipepid output
-    infile_name = sys.argv[1]
-    print(f'Reading mipepid output from {infile_name}')
-    df = pd.read_csv(infile_name, header=0, sep=',')
-    df = df.astype({"start_at": "int", "end_at": "int"})
-    print(f'{len(df)} read')
-    # df['start_at'] = df['start_at'].astype('int')
-    # df['end_at'] = df['end_at'].astype('int')
-
-    df['len'] = df['end_at'] - df['start_at'] + 1 > 50
-
-    # df['orflen'] = int(df['end_at']) - int(df['start_at']) + 1
-
-    # for length_cutoff in range(0, 110, 10):
     p = (df['true_label'] == 'positive').sum()
     n = (df['true_label'] == 'negative').sum()
     tp = (df['true_label'] == 'positive') & (df['classification'] == 'coding')
     fp = (df['true_label'] == 'negative') & (df['classification'] == 'coding')
     tp = tp.sum()
     fp = fp.sum()
-    recall = tp / p
-    precision = tp / (tp + fp)
-    pass
 
-    print()
+    return p, n, tp / (tp + fp), tp / p
 
-    # 1. use get_seq() to extract DNA sequences
-    # get_seq('positive')
-    # get_seq('negative')
-    # 2. run mipepid program in command line
-    # python3 ./src/mipepid.py  ../data/MiPepid/MiPepid_positive_data.fa ../data/MiPepidOutput/MiPepid_pos_data1.csv
-    # python3 ./src/mipepid.py  ../data/MiPepid/MiPepid_negative_data.fa ../data/MiPepidOutput/MiPepid_neg_data1.csv
-    # 3. summarize the classification results
-    # print_result()
-    ############# RESULT ###############
-    # MiPepid_pos
-    # coding       3907
-    # noncoding      80
-    # Name: classification, dtype: int64
-    # MiPepid_neg
-    # coding       2135
-    # noncoding     801
-    # Name: classification, dtype: int64
-    ####################################
+
+# ===================================================================================================
+# Main
+# ==================================================================================================
+if __name__ == '__main__':
+    print('mipepid validation')
+    try:
+        threshold = float(sys.argv[2])
+    except IndexError:
+        threshold = 0.6
+    lengths = [0, 110, 10]
+    print(f'Probability threshold: {threshold}')
+    print(f'Lengths: {lengths[0]} to {lengths[1]} by {lengths[2]}')
+
+    # read the mipepid output
+    infile_name = sys.argv[1]
+    print(f'\nReading mipepid output from {infile_name}')
+    df = pd.read_csv(infile_name, header=0, sep=',')
+    df = df.astype({"start_at": "int", "end_at": "int"})
+    print(f'{len(df)} read')
+
+    print(f'\nP   len npos    nneg      prec  recall')
+    for l in range(lengths[0], lengths[1], lengths[2]):
+        # select by length
+        len_ok = df['end_at'] - df['start_at'] + 1 > l
+        df1 = df[len_ok]
+
+        npos, nneg, precision, recall = stats(df1)
+        print(f'{threshold}\t{l:3d}\t{npos:4d}\t{nneg:4d}\t{precision:.4f}\t{recall:.4f}')
 
 exit(0)
