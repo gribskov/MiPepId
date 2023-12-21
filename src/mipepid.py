@@ -202,6 +202,14 @@ if __name__ == '__main__':
     batch = []
     n_predicted = 0
     sys.stderr.write(f'\nBeginning predictions for {len(filtered_orfs)} sequences\n')
+
+    # open output file and write column header
+    columns = ['sORF_ID', 'sORF_seq', 'start_at', 'end_at', 'true_label', 'tags']
+    outfile = open(output_fname, 'w')
+    outfile.write(','.join(columns))
+    outfile.write('\n')
+    outfile.close()
+
     for s in filtered_orfs:
 
         sorf_tag = ';'.join(s.tag)
