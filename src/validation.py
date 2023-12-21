@@ -2,22 +2,22 @@
 MiPepid:validation.py
 Original code from from QIHUA LIANG <qili00002@stud.uni-saarland.de>
 
+mipepid.py output is csv with columns
+sORF_ID,sORF_seq,start_at,end_at,true_label,tags,classification,score,probability
+
 
 21 December 2023     gribskov
 ================================================================================================="""
-
 import sys
 import pandas as pd
 
 
-def input_file(i):
-    df = pd.read_csv('./data/MiPepid/datasets/' + i + '_original_data.csv', header=0, sep=',')
-    seq = df['DNAseq']
-    seq.rename('RNAseq')
-    return seq
-
-
 def get_seq(i):
+    """
+    Does not seem needed
+    :param i:
+    :return:
+    """
     a = input_file(i)
     file_out = './data/MiPepid/MiPepid_' + i + '_data.fa'
     print('output={}'.format(file_out))
@@ -28,38 +28,33 @@ def get_seq(i):
 
 
 def print_result():
-    threshold = 0.75
-    pos = sys.argv[1]
-    neg = sys.argv[2]
-    print('positive data:{}'.format(pos));
-    print('negative data:{}'.format(neg));
     db = {'positive': pos, 'negative': neg}
-    for length_cutoff in range(0, 110, 10):
-        # print('\nLength >= {}'.format(length_cutoff))
-        tf = {}
-        print('\nlength:{}\tthreshold:{}'.format(length_cutoff, threshold))
-        for i in db:
-            df = pd.read_csv(db[i])
-            select = (df['end_at'] - df['start_at'] + 1) >= length_cutoff
-            ii = i[:3]
-            # print('{} -> {}'.format(i, ii))
-            # print(select)
-            ##print (df['sORF_ID'])
-            # print (df['sORF_ID'].str.endswith('_ORF1'))
-            # df1 = df.loc[df['sORF_ID'].str.endswith('_ORF1'), ['transcript_DNA_sequence_ID', 'classification']]
-            df1 = df.loc[
-                select, ['transcript_DNA_sequence_ID', 'classification', 'probability']]
-            # df1['alt'] = df1['probability'] >= threshold
-            df1['alt'] = df1['probability'].apply(
-                lambda x: 'altcoding' if x > threshold else 'altnoncoding')
-            # f1['A'] = df1['A'].apply(lambda x: [y if y <= 9 else 11 for y in x])
-            pts = df1.alt.value_counts()
-            print('    {:8s}{:8d}{:8d}'.format(ii, pts[0], pts[1]))
-            # print(df1.head())
-            cts = df1.classification.value_counts()
-            # tf[ii] = [cts[0], cts[1]]
-            tf[ii] = [pts[0], pts[1]]
-            # print(cts)
+
+    # print('\nLength >= {}'.format(length_cutoff))
+    tf = {}
+
+    for i in db:
+        df = pd.read_csv(db[i])
+        select = (df['end_at'] - df['start_at'] + 1) >= length_cutoff
+        ii = i[:3]
+        # print('{} -> {}'.format(i, ii))
+        # print(select)
+        ##print (df['sORF_ID'])
+        # print (df['sORF_ID'].str.endswith('_ORF1'))
+        # df1 = df.loc[df['sORF_ID'].str.endswith('_ORF1'), ['transcript_DNA_sequence_ID', 'classification']]
+        df1 = df.loc[
+            select, ['transcript_DNA_sequence_ID', 'classification', 'probability']]
+        # df1['alt'] = df1['probability'] >= threshold
+        df1['alt'] = df1['probability'].apply(
+            lambda x: 'altcoding' if x > threshold else 'altnoncoding')
+        # f1['A'] = df1['A'].apply(lambda x: [y if y <= 9 else 11 for y in x])
+        pts = df1.alt.value_counts()
+        print('    {:8s}{:8d}{:8d}'.format(ii, pts[0], pts[1]))
+        # print(df1.head())
+        cts = df1.classification.value_counts()
+        # tf[ii] = [cts[0], cts[1]]
+        tf[ii] = [pts[0], pts[1]]
+        # print(cts)
 
         n = 'neg'
         p = 'pos'
@@ -74,10 +69,58 @@ def print_result():
         print('precision\t{:5.3f}\t{:5.3f}\t{:5.3f}'.format(pp, pn, pa))
 
 
-# ==================================================================================================
+def precision(df, threshold):
+    """---------------------------------------------------------------------------------------------
+
+    :param df:
+    :param threshold:
+    :return:
+    ---------------------------------------------------------------------------------------------"""
+
+
+def filter_length(df):
+    """---------------------------------------------------------------------------------------------
+
+    :param df:
+    :return:
+    ---------------------------------------------------------------------------------------------"""
+
+
+# ===================================================================================================
 # Main
 # ==================================================================================================
 if __name__ == '__main__':
+    threshold = 0.75
+    lengths = [0, 110, 10]
+    print(f'Probability threshold: {threshold}')
+    print(f'Lengths: {lengths[0]} to {lengths[1]} by {lengths[2]}')
+
+    # read the mipepid output
+    infile_name = sys.argv[1]
+    print(f'Reading mipepid output from {infile_name}')
+    df = pd.read_csv(infile_name, header=0, sep=',')
+    df = df.astype({"start_at": "int", "end_at": "int"})
+    print(f'{len(df)} read')
+    # df['start_at'] = df['start_at'].astype('int')
+    # df['end_at'] = df['end_at'].astype('int')
+
+    df['len'] = df['end_at'] - df['start_at'] + 1 > 50
+
+    # df['orflen'] = int(df['end_at']) - int(df['start_at']) + 1
+
+    # for length_cutoff in range(0, 110, 10):
+    p = (df['true_label'] == 'positive').sum()
+    n = (df['true_label'] == 'negative').sum()
+    tp = (df['true_label'] == 'positive') & (df['classification'] == 'coding')
+    fp = (df['true_label'] == 'negative') & (df['classification'] == 'coding')
+    tp = tp.sum()
+    fp = fp.sum()
+    recall = tp / p
+    precision = tp / (tp + fp)
+    pass
+
+    print()
+
     # 1. use get_seq() to extract DNA sequences
     # get_seq('positive')
     # get_seq('negative')
@@ -85,7 +128,7 @@ if __name__ == '__main__':
     # python3 ./src/mipepid.py  ../data/MiPepid/MiPepid_positive_data.fa ../data/MiPepidOutput/MiPepid_pos_data1.csv
     # python3 ./src/mipepid.py  ../data/MiPepid/MiPepid_negative_data.fa ../data/MiPepidOutput/MiPepid_neg_data1.csv
     # 3. summarize the classification results
-    print_result()
+    # print_result()
     ############# RESULT ###############
     # MiPepid_pos
     # coding       3907
