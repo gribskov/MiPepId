@@ -105,6 +105,10 @@ if __name__ == '__main__':
     df = df.astype({"start_at": "int", "end_at": "int"})
     print(f'{len(df)} read')
 
+    # recall classification using desire P threshold
+    pclass = ['noncoding', 'coding']
+    df['classification'] = df['probability'].apply(lambda x: 'coding' if x > t else 'noncoding')
+
     print(f'\nP   len npos    nneg      prec  recall')
     for l in range(lengths[0], lengths[1], lengths[2]):
         # select by length
