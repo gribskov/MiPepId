@@ -96,7 +96,13 @@ class Dataset:
                     selected_orfs.append(orf)
 
         elif label == "negative":
+            negative_id_list = {}
             for entry in self.data:
+                if entry['EnsemblTranscriptID'] in negative_id_list:
+                    # skip any duplicate sequence entries
+                    continue
+                negative_id_list[entry['EnsemblTranscriptID']] = 1
+
                 # transcriptDNAseq is the complete sequence, we'll re-call the orfs
                 orf = ORF(entry['transcriptDNAseq'], seqid=entry['EnsemblTranscriptID'])
                 # DNAlength does not include stop codon
@@ -199,6 +205,8 @@ if __name__ == '__main__':
     for s in filtered_orfs:
 
         sorf_tag = ';'.join(s.tag)
+        # if s.seqid.startswith('ENST'):
+        #     print('test')
         if len(s.pos) > 1:
             # multiple ORFs
             n_orf = 0
@@ -212,7 +220,9 @@ if __name__ == '__main__':
                 batch.append([sorf_id, sorf_seq, begin, end, s.label, sorf_tag])
         else:
             # just one ORF
-            batch.append([s.seqid, s.seq, s.pos[0][0], s.pos[0][1], s.label, sorf_tag])
+            begin = s.pos[0][0]
+            end = s.pos[0][1]
+            batch.append([s.seqid, s.seq[begin:end], begin, end, s.label, sorf_tag])
 
         # Process in batch, each batch >= batch_size ORFs
         if len(batch) > batch_size:
