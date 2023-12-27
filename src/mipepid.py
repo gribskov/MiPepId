@@ -166,9 +166,9 @@ class Dataset:
         return taglist
 
 
-# ===================================================================================================
+# ==================================================================================================
 # End of class Dataset
-# ===================================================================================================
+# ==================================================================================================
 
 
 # ==================================================================================================
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     sys.stderr.write(f'\nBeginning predictions for {len(filtered_orfs)} sequences\n')
 
     # open output file and write column header
-    columns = ['sORF_ID', 'sORF_seq', 'start_at', 'end_at', 'true_label', 'tags']
+    columns = ['sORF_ID','sORF_seq','start_at','end_at','true_label','tags','classification','score','probability']
     outfile = open(output_fname, 'w')
     outfile.write(','.join(columns))
     outfile.write('\n')
