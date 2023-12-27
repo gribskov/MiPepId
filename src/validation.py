@@ -105,17 +105,20 @@ if __name__ == '__main__':
     df = df.astype({"start_at": "int", "end_at": "int"})
     print(f'{len(df)} read')
 
-    # recall classification using desire P threshold
-    pclass = ['noncoding', 'coding']
-    df['classification'] = df['probability'].apply(lambda x: 'coding' if x > t else 'noncoding')
+    print(f'\n   P    len npos    nneg      prec  recall')
+    t = threshold
+    while t <= 0.9:
+        # recall classification using desire P threshold
+        pclass = ['noncoding', 'coding']
+        df['classification'] = df['probability'].apply(lambda x: 'coding' if x > t else 'noncoding')
 
-    print(f'\nP   len npos    nneg      prec  recall')
-    for l in range(lengths[0], lengths[1], lengths[2]):
-        # select by length
-        len_ok = df['end_at'] - df['start_at'] + 1 > l
-        df1 = df[len_ok]
+        for l in range(lengths[0], lengths[1], lengths[2]):
+            # select by length
+            len_ok = df['end_at'] - df['start_at'] + 1 > l
+            df1 = df[len_ok]
 
-        npos, nneg, precision, recall = stats(df1)
-        print(f'{threshold}\t{l:3d}\t{npos:4d}\t{nneg:4d}\t{precision:.4f}\t{recall:.4f}')
+            npos, nneg, precision, recall = stats(df1)
+            print(f'{t:.2f}\t{l:3d}\t{npos:4d}\t{nneg:4d}\t{precision:.4f}\t{recall:.4f}')
+        t += 0.05
 
 exit(0)
