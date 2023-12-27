@@ -78,7 +78,33 @@ class ORF:
         self.pos = rflist
         return True
 
+    def long_orfs(self):
+        """-----------------------------------------------------------------------------------------
+        for each reading frame, remove all in-frame start and stop codons creating a long ORF
 
-# ===================================================================================================
+        :return: list   three sequence strings
+        -----------------------------------------------------------------------------------------"""
+        seq = self.seq
+        orf = []
+        for frame in (0, 1, 2):
+            newseq = ''
+            for pos in range(frame, len(seq)-3, 3):
+                codon = seq[pos:pos+3]
+                if codon in self.start or codon in self.stop:
+                    continue
+                newseq += codon
+            orf.append(newseq)
+
+        return orf
+
+# ==================================================================================================
 # end of class ORF
-# ===================================================================================================
+# ==================================================================================================
+
+# testing
+
+if __name__ == '__main__':
+    seq = ORF('AACTGCCCTCAAGGAGCTTACAATCTAGCTGGGGGTAAATGACTTGCACATGAACACAACTAGACTGTGAGCTTCTAGAGGGC')
+    orf = seq.long_orfs()
+
+    exit(0)
