@@ -34,7 +34,9 @@ class Dataset:
         if label:
             self.label = label
 
-        if filename:
+        if filename and label == 'unknown':
+            self.read_fasta(filename)
+        else:
             self.read_data(filename)
 
     def read_data(self, filename):
@@ -59,6 +61,53 @@ class Dataset:
             self.data.append({col[i]: field[i] for i in range(len(col))})
 
         return len(self.data)
+
+    def read_fasta(self, filename):
+        """-----------------------------------------------------------------------------------------
+        Read in unknown sequence for prediction. Input is standard Fasta format, e.g.
+        >SPROHSA001781
+        ATGTATACGCTGCCTCGCCAGGCCACACCAGGTGTTCCTGCACAGCAGTCCCCAAGCATGTGA
+        >SPROHSA001792
+        ATGTGTGGTAACACCATGTCTGTGCCCCTGCTCACCGATGCTGCCACCGTGTCTGGAGCTGAGC
+
+        original code wsd
+        for rec in SeqIO.parse(input_fname, 'fasta'):
+        DNA_seq = str(rec.seq).upper()
+        obj_ORFs = ORFs(DNA_seq)
+        transcript_seq_ID = rec.id
+        this_sORFs = collect_and_name_sORFs_from_an_ORFs_object(obj_ORFs, transcript_seq_ID)
+        all_sORFs += this_sORFs
+
+        :param filename     string
+        :return: int        number of sequences read
+        -----------------------------------------------------------------------------------------"""
+        infile = open(filename, 'r')
+        if not infile:
+            sys.stderr.write(f'mipepid.py:read_fasta() cannot open input file ({filename}')
+            exit(2)
+
+        sequences = []
+        for line in infile:
+            if line.startswith('>'):
+                seqentry = {}
+                sequences.append(seqentry)
+                try:
+                    id, doc = line.split(' ')
+                except:
+                    id = line
+                    doc = ''
+                seqentry['id'] = id.rstrip().replace('>', '')
+                seqentry['doc'] = doc
+                seqentry['seq'] = ''
+            else:
+                seqentry['seq'] += line.rstrip()
+
+        # Convert to ORFS
+        for seq in sequences:
+            orf = ORF(seq['seq'], seq['id'], split=True)
+            print(orf)
+
+        return len(sequences)
 
     def orf_filter(self, label, constraints):
         """-----------------------------------------------------------------------------------------
@@ -182,17 +231,20 @@ if __name__ == '__main__':
     filter_len = 30
     threshold = 0.75
 
-    pos = Dataset(sys.argv[1], 'positive')
-    sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
-    filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
-    n_pos_filt = len(filtered_orfs)
-    sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
+    fasta = Dataset('../datasets/positive_original.fasta_test.fa', 'unknown')
+    fasta.read_fasta()
 
-    neg = Dataset(sys.argv[2], 'negative')
-    sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
-    filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
-    n_neg_filt = len(filtered_orfs) - n_pos_filt
-    sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
+    # pos = Dataset(sys.argv[1], 'positive')
+    # sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
+    # filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
+    # n_pos_filt = len(filtered_orfs)
+    # sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
+    #
+    # neg = Dataset(sys.argv[2], 'negative')
+    # sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
+    # filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
+    # n_neg_filt = len(filtered_orfs) - n_pos_filt
+    # sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
 
     # load the model
     sys.stderr.write(f'\nLoading regression model from {model_fname}...\n')
@@ -204,7 +256,8 @@ if __name__ == '__main__':
     sys.stderr.write(f'\nBeginning predictions for {len(filtered_orfs)} sequences\n')
 
     # open output file and write column header
-    columns = ['sORF_ID','sORF_seq','start_at','end_at','true_label','tags','classification','score','probability']
+    columns = ['sORF_ID', 'sORF_seq', 'start_at', 'end_at', 'true_label', 'tags', 'classification', 'score',
+               'probability']
     outfile = open(output_fname, 'w')
     outfile.write(','.join(columns))
     outfile.write('\n')
