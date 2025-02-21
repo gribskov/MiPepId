@@ -104,8 +104,15 @@ class Dataset:
 
         # Convert to ORFS
         for seq in sequences:
-            orf = ORF(seq['seq'], seq['id'], split=True)
-            print(orf)
+            splitorf = ORF(seq['seq'], seq['id'], split=True)
+            print(f"{seq['id']}\t{splitorf.pos}")
+            for i, orf in enumerate(splitorf.pos):
+                self.data.append({'orfID':          f"{seq['id']}_{orf[0]}_{orf[1]}",
+                                  'startCodon':     seq['seq'][orf[0]:orf[0] + 3],
+                                  'stopCodon':      seq['seq'][orf[1]:orf[1] + 3],
+                                  'startCodonSite': orf[0],
+                                  'stopCodonSite':  orf[1]
+                                  })
 
         return len(sequences)
 
@@ -231,8 +238,7 @@ if __name__ == '__main__':
     filter_len = 30
     threshold = 0.75
 
-    fasta = Dataset('../datasets/positive_original.fasta_test.fa', 'unknown')
-    fasta.read_fasta()
+    # fasta = Dataset('../datasets/negative_original.fasta_test.fa', 'unknown')
 
     # pos = Dataset(sys.argv[1], 'positive')
     # sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
@@ -241,10 +247,11 @@ if __name__ == '__main__':
     # sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
     #
     # neg = Dataset(sys.argv[2], 'negative')
-    # sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
-    # filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
-    # n_neg_filt = len(filtered_orfs) - n_pos_filt
-    # sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
+    neg = Dataset('../datasets/negative_original_data.csv', 'negative')
+    sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
+    filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
+    n_neg_filt = len(filtered_orfs) - n_pos_filt
+    sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
 
     # load the model
     sys.stderr.write(f'\nLoading regression model from {model_fname}...\n')

@@ -2,6 +2,14 @@ class ORF:
     """=============================================================================================
     An orf holds a sequence, a list of begin and end coordinates of ORFs, and minimal metadata
     sequence ID, source ID
+
+    sequence    entire subject sequence (preferably) or an extracted subsequence defined by offset
+    offset      offset that would convert internal coordinate to the source coordinate
+    seqid       ID of subject sequence
+    label       text label describing the sequence ('positive', 'negative', 'unknown' ...)
+    tag         additional class tags such as 'high quality' or 'miRNA'
+    pos: list   [begin,end] positions of ORFs beginning with start and ending with stop codons
+
     ============================================================================================="""
     allowed_start_codons = ['ATG']
     allowed_stop_codons = ['TAA', 'TAG', 'TGA']
@@ -9,12 +17,8 @@ class ORF:
     def __init__(self, seq, seqid='', start=None, stop=None, split=False):
         """-----------------------------------------------------------------------------------------
         attributes:
-        seq: string             sequence of the region of interest, preferably the
-        entire source
-                                sequence
+        seq: string             sequence of the region of interest, preferably entire source sequence
         id: string              ID of source sequence
-        start: list of string   allowed start codons, default is 
-        stop: list of string    allowed stop codons, default is 
         pos: list of list       [[orf_begin_pos, orf_end_pos], ... ]
         offset: int             offset that would convert internal coordinate to the source 
                                 coordinate
@@ -23,14 +27,10 @@ class ORF:
 
         :param seq: string      populates ORF.seq
         :param seqid: string    populates ORF.seqid
-        :param start: list      alternative start codon (strings, upper case)
-        :param stop: list       alternative stop codons (strings, upper case)
         :param split: bool      if True, the provided region will be split into smaller ORFs
         -----------------------------------------------------------------------------------------"""
         self.seq = seq
         self.seqid = ''
-        self.start = ORF.allowed_start_codons
-        self.stop = ORF.allowed_stop_codons
         self.pos = [[0, len(self.seq)]]
         self.offset = 0
         self.label = ''
@@ -51,13 +51,19 @@ class ORF:
         search the current ORF regions stored in pos and find minimal ORFs that start at a start
         codon and end at the first encountered stop codon.
 
-        :return: bool   True
+        Updates pos attribute in object. Positions give the position of the first base of the
+        start/stop codon in the sequence
+
+        TODO should terminal ORFs without stop codon be reported?
+
+        :return: int    number of ORFs found
         -----------------------------------------------------------------------------------------"""
         sequence = self.seq
-        start = self.start
-        stop = self.stop
+        start = ORF.allowed_start_codons
+        stop = ORF.allowed_stop_codons
         rflist = []
-        # open gives the current start position in each RF. Must begin with a start codon
+
+        # orfopen gives the current start position in each RF. ORF must begin with a start codon
         orfopen = [-1, -1, -1]
         for pos in range(len(sequence)):
             frame = pos % 3
@@ -76,7 +82,7 @@ class ORF:
                     orfopen[frame] = -1
 
         self.pos = rflist
-        return True
+        return len(rflist)
 
     def long_orfs(self):
         """-----------------------------------------------------------------------------------------
