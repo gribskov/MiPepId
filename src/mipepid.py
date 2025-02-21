@@ -69,7 +69,7 @@ class DataSet(list):
         Constructor: see class docstring
         TODO change data to a more informative name. info? attributes (like GFF)?
         -----------------------------------------------------------------------------------------"""
-        super().__init__()      # doesn't do anything
+        super().__init__()  # doesn't do anything
         if label:
             self.label = label
 
@@ -322,21 +322,32 @@ if __name__ == '__main__':
     filter_len = 30
     threshold = 0.75
 
-    # fasta = DataSet('../datasets/negative_original.fasta_test.fa', 'unknown')
+    mode = 'predict'
 
-    # pos = DataSet(sys.argv[1], 'positive')
-    # sys.stderr.write(f'Positive sequences read: {len(pos)}\n')
-    # filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
-    # n_pos_filt = len(filtered_orfs)
-    # sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
-    #
-    neg = DataSet(sys.argv[2], 'negative')
-    sys.stderr.write(f'Negative sequences read: {len(neg)}\n')
-    filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
-    n_neg_filt = len(filtered_orfs) - n_pos_filt
-    sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
+    if mode == 'predict':
+        # predict mode uses just one FastA file
+        sys.stderr.write(f'FastA data: {sys.argv[1]}\n')
+        fasta = DataSet('../datasets/negative_original.fasta_test.fa', 'unknown')
+        sys.stderr.write(f'Sequences read: {len(fasta)}\n')
 
-    # load the model
+    else:
+        # validation mode reads a positive and negative dataset as .csv files. The fields of the positive and negative
+        # files are different, see DataSet:read_csv
+        pos = DataSet(sys.argv[1], 'positive')
+        sys.stderr.write(f'Positive data: {sys.argv[1]}\n')
+        sys.stderr.write(f'Positive sequences read: {len(pos)}\n')
+        filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
+        n_pos_filt = len(filtered_orfs)
+        sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
+
+        neg = DataSet(sys.argv[2], 'negative')
+        sys.stderr.write(f'Negative data: {sys.argv[2]}\n')
+        sys.stderr.write(f'Negative sequences read: {len(neg)}\n')
+        filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
+        n_neg_filt = len(filtered_orfs) - n_pos_filt
+        sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
+
+    # load the trained model
     sys.stderr.write(f'\nLoading regression model from {model_fname}...\n')
     logr, threshold = ML.load_model(model_fname=model_fname)
     sys.stderr.write(f'... completed loading model\n')
