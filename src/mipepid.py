@@ -1,9 +1,6 @@
-import sys
-
-import ML
-from ORF import ORF
-
 """
+
+
     Mengmeng's positive and negative datasets have different fields, so the simplest solution is to
     store them as a dict and use functions to convert them to ORFs for prediction.
 
@@ -19,9 +16,13 @@ from ORF import ORF
         EnsemblTranscriptID,transcriptBiotype,transcriptDNAseq,EnsemblGeneID,geneBiotype
 
     unknowns are read in FastA format by and separated into ORFs read_fasta()
+"""
+# TODO update and incorporate this into current documentation
 
-    a Dataset is a list of dictionaries with the above fields
-    """
+import sys
+
+import ML
+from ORF import ORF
 
 
 class DataEntry:
@@ -68,6 +69,7 @@ class DataSet(list):
         Constructor: see class docstring
         TODO change data to a more informative name. info? attributes (like GFF)?
         -----------------------------------------------------------------------------------------"""
+        super().__init__()      # doesn't do anything
         if label:
             self.label = label
 
@@ -129,7 +131,6 @@ class DataSet(list):
 
         for line in infile:
             field = line.rstrip().split(',')
-            # self.data.append({col[i]: field[i] for i in range(len(col))})
             entry = DataEntry(orf_id=field[seq],
                               orf_seq=field[source],
                               start_at=int(field[start]),
@@ -144,7 +145,7 @@ class DataSet(list):
 
             self.append(entry)
 
-        return len(self.data)
+        return len(self)
 
     def read_fasta(self, filename):
         """-----------------------------------------------------------------------------------------
@@ -175,7 +176,7 @@ class DataSet(list):
                 sequences.append(seqentry)
                 try:
                     id, doc = line.split(' ')
-                except:
+                except ValueError:
                     id = line
                     doc = ''
                 seqentry['id'] = id.rstrip().replace('>', '')
@@ -214,20 +215,20 @@ class DataSet(list):
         negative fields: orfID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,
         EnsemblTranscriptID,transcriptBiotype,transcriptDNAseq,EnsemblGeneID,geneBiotype
 
-        :param self: object         Dataset
+        :param self: DataSet
         :param label: string        should be "positive" or "negative"
         :param constraints: dict    keys=column labels, values = [] of allowed values
         :return: list of ORF        selected ORFs (see ORF.py)
         -----------------------------------------------------------------------------------------"""
         selected_orfs = []
         if label == "positive":
-            for entry in self.data:
+            for entry in self:
                 orf = ORF(entry['DNAseq'], seqid=entry['SmProtID'])
                 # DNAlength does not include stop codon
                 orf.pos = [[0, int(entry['stopCodonSite']) - int(entry['startCodonSite']) + 3]]
                 orf.offset = entry['startCodonSite']
                 orf.label = 'positive'
-                orf.tag = Dataset.to_unique_tag(entry['corresponding_transcriptBiotypes'])
+                orf.tag = DataSet.to_unique_tag(entry['corresponding_transcriptBiotypes'])
                 if entry['IsHighConfidence'] == 'Yes':
                     orf.tag.append('HighConfidence')
 
@@ -236,7 +237,7 @@ class DataSet(list):
 
         elif label == "negative":
             negative_id_list = {}
-            for entry in self.data:
+            for entry in self:
                 if entry['EnsemblTranscriptID'] in negative_id_list:
                     # skip any duplicate sequence entries
                     continue
@@ -248,14 +249,14 @@ class DataSet(list):
                 orf.pos = [[0, len(orf.seq) - 3]]
                 orf.offset = 0
                 orf.label = 'negative'
-                orf.tag = Dataset.to_unique_tag(entry['transcriptBiotype'])
+                orf.tag = DataSet.to_unique_tag(entry['transcriptBiotype'])
                 orf.split_orfs()
 
                 if self.apply_constraints(entry, constraints):
                     selected_orfs.append(orf)
 
         else:
-            sys.stderr.write(f'mipepid:Dataset:orf_filter() - unkown dataset label ({label})')
+            sys.stderr.write(f'mipepid:DataSet:orf_filter() - unkown dataset label ({label})')
 
         return selected_orfs
 
@@ -306,7 +307,7 @@ class DataSet(list):
 
 
 # ==================================================================================================
-# End of class Dataset
+# End of class DataSet
 # ==================================================================================================
 
 
@@ -324,14 +325,13 @@ if __name__ == '__main__':
     # fasta = DataSet('../datasets/negative_original.fasta_test.fa', 'unknown')
 
     # pos = DataSet(sys.argv[1], 'positive')
-    # sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
+    # sys.stderr.write(f'Positive sequences read: {len(pos)}\n')
     # filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
     # n_pos_filt = len(filtered_orfs)
     # sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
     #
     neg = DataSet(sys.argv[2], 'negative')
-    # neg = Dataset('../datasets/negative_original_data.csv', 'negative')
-    sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
+    sys.stderr.write(f'Negative sequences read: {len(neg)}\n')
     filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
     n_neg_filt = len(filtered_orfs) - n_pos_filt
     sys.stderr.write(f'Negative sequences after filtering ({filter_len}): {n_neg_filt}\n')
