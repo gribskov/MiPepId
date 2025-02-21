@@ -3,9 +3,7 @@ import sys
 import ML
 from ORF import ORF
 
-
-class Dataset:
-    """=============================================================================================
+"""
     Mengmeng's positive and negative datasets have different fields, so the simplest solution is to
     store them as a dict and use functions to convert them to ORFs for prediction.
 
@@ -20,74 +18,158 @@ class Dataset:
         fields: orfID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,
         EnsemblTranscriptID,transcriptBiotype,transcriptDNAseq,EnsemblGeneID,geneBiotype
 
+    unknowns are read in FastA format by and separated into ORFs read_fasta()
+
     a Dataset is a list of dictionaries with the above fields
+    """
+
+
+class DataEntry:
+    """=============================================================================================
+    DataEntry is ultimately used to feed ML:batch_predict: All Data entries have the following
+    necessary information for each ORF in the dataset:
+        orf_id      name after extracting from original sequence
+        orf_seq     sequence after extracting from sequence
+        source:     id of original sequence the ORF is extracted from
+        start_at    position of the first base of the start codon in the original sequence
+        end_at      position of the first base of the stop codon in the original sequence
+        class_label typically 'positive', 'negative', or 'unknown'
+        tags        list of additional tags (such as data source) to display in report
+
+    optional additional information is stored in
+        data        other information from input stored as dict
+
+    Only ORF_seq is used for the prediction; the other fields are just for the report
+    ============================================================================================="""
+
+    def __init__(self, orf_id='', orf_seq='', source='', start_at=None, end_at=None,
+                 class_label='unknown'):
+        """-----------------------------------------------------------------------------------------
+        Constructor: see class DataEntry docstring
+        TODO change data to a more informative name. info? attributes (like GFF)?
+        -----------------------------------------------------------------------------------------"""
+        self.orf_id = orf_id
+        self.orf_seq = orf_seq
+        self.source = source
+        self.start_at = start_at
+        self.end_at = end_at
+        self.class_label = class_label
+        self.tags = []
+        self.data = []
+
+
+class DataSet(list):
+    """=============================================================================================
+    DataSet is a collection of DataEntry
     ============================================================================================="""
 
     def __init__(self, filename, label):
         """-----------------------------------------------------------------------------------------
-        Constructor
-
-        :param label: string        expect "positive" or "negative"
-        :param filename: string     filename for the input data
+        Constructor: see class docstring
+        TODO change data to a more informative name. info? attributes (like GFF)?
         -----------------------------------------------------------------------------------------"""
-        self.data = []
         if label:
             self.label = label
 
-        if filename and label == 'unknown':
-            self.read_fasta(filename)
-        else:
-            self.read_data(filename)
+        if filename:
+            if self.label == 'positive':
+                self.read_csv(filename)
+            elif self.label == 'negative':
+                self.read_csv(filename)
+            else:
+                # anything else is unknown
+                self.read_fasta(filename)
 
-    def read_data(self, filename):
+    def read_csv(self, filename):
         """-----------------------------------------------------------------------------------------
-        Read in the data and store as annotated in the .csv file as a list of hashes. The
-        first line is a comma delimited string with the column titles. These become the  dictionary
-        keys.
+        Positive and negative data are specially formatted with metadata that comes from the
+        respective sources, SmProt and Ensembl. The fields for each are shown below
+
+        positive
+        SmProtID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,transcriptID,
+        corresponding_EnsemblTranscriptIDs,corresponding_transcriptBiotypes,transcriptDNAseq,
+        corresponding_EnsemblGeneIDs,corresponding_geneBiotypes,dataSource,IsHighConfidence
+
+        negative
+        orfID,DNAseq,DNAlength,startCodon,stopCodon,startCodonSite,stopCodonSite,
+        EnsemblTranscriptID,transcriptBiotype,transcriptDNAseq,EnsemblGeneID,geneBiotype
 
         :param filename: string     path to the source .csv file
         :return: int                number of sequences read
         -----------------------------------------------------------------------------------------"""
         infile = open(filename, 'r')
         if not infile:
-            sys.stderr.write(f'mipepid.py:read_data() cannot open input file ({filename}')
+            sys.stderr.write(f'DataSet:read_csv() cannot open input file ({filename}')
             exit(1)
 
         # read the column labels
         col = infile.readline().rstrip().split(',')
+        colidx = {col[i]: i for i in range(len(col))}
+
+        # select columns to populate fields in DataEntry
+        if self.label == 'positive':
+            seq = colidx['DNAseq']
+            source = colidx['SmProtID']
+            start = colidx['startCodonSite']
+            stop = colidx['stopCodonSite']
+            tags = [colidx['dataSource'], colidx['IsHighConfidence']]
+            attributes = [colidx['transcriptID'], colidx['corresponding_EnsemblTranscriptIDs'],
+                          colidx['corresponding_transcriptBiotypes'],
+                          colidx['transcriptDNAseq'], colidx['corresponding_EnsemblGeneIDs'],
+                          colidx['corresponding_geneBiotypes']]
+
+        elif self.label == 'negative':
+            seq = colidx['DNAseq']
+            source = colidx['EnsemblTranscriptID']
+            start = colidx['startCodonSite']
+            stop = colidx['stopCodonSite']
+            tags = []
+            attributes = [colidx['transcriptBiotype'], colidx['transcriptDNAseq'],
+                          colidx['EnsemblGeneID'], colidx['geneBiotype']]
 
         for line in infile:
             field = line.rstrip().split(',')
-            self.data.append({col[i]: field[i] for i in range(len(col))})
+            # self.data.append({col[i]: field[i] for i in range(len(col))})
+            entry = DataEntry(orf_id=field[seq],
+                              orf_seq=field[source],
+                              start_at=int(field[start]),
+                              end_at=int(field[stop]),
+                              class_label=self.label,
+                              )
+            self.append(entry)
+            for t in tags:
+                entry.tags.append(f'{col[t]}={field[t]}')
+            for attr in attributes:
+                entry.data.append(f'{col[attr]}={field[attr]}')
+
+            self.append(entry)
 
         return len(self.data)
 
     def read_fasta(self, filename):
         """-----------------------------------------------------------------------------------------
-        Read in unknown sequence for prediction. Input is standard Fasta format, e.g.
+        Read in sequences for prediction. Input is standard Fasta format, e.g.
         >SPROHSA001781
         ATGTATACGCTGCCTCGCCAGGCCACACCAGGTGTTCCTGCACAGCAGTCCCCAAGCATGTGA
         >SPROHSA001792
         ATGTGTGGTAACACCATGTCTGTGCCCCTGCTCACCGATGCTGCCACCGTGTCTGGAGCTGAGC
 
-        original code wsd
-        for rec in SeqIO.parse(input_fname, 'fasta'):
-        DNA_seq = str(rec.seq).upper()
-        obj_ORFs = ORFs(DNA_seq)
-        transcript_seq_ID = rec.id
-        this_sORFs = collect_and_name_sORFs_from_an_ORFs_object(obj_ORFs, transcript_seq_ID)
-        all_sORFs += this_sORFs
+        All orfs with a start codon in DataSet.allowed_start_codons and a stop codon in
+        DataSet.allowed_stop_codns are extracted. Not that RFs starting at a start codon but with
+        no stop codon before the end of the sequence are NOT extracted (see ORF.py). The stop codon
+        is not included in the extracted sequence.
 
-        :param filename     string
-        :return: int        number of sequences read
+        :param filename     string, sequence file in FastA format
+        :return: int        number of orfs read
         -----------------------------------------------------------------------------------------"""
         infile = open(filename, 'r')
         if not infile:
-            sys.stderr.write(f'mipepid.py:read_fasta() cannot open input file ({filename}')
+            sys.stderr.write(f'DataSet:read_fasta() cannot open input file ({filename}')
             exit(2)
 
         sequences = []
         for line in infile:
+            # read all sequences and store in dict indexed by sequence ID
             if line.startswith('>'):
                 seqentry = {}
                 sequences.append(seqentry)
@@ -107,18 +189,19 @@ class Dataset:
             splitorf = ORF(seq['seq'], seq['id'], split=True)
             print(f"{seq['id']}\t{splitorf.pos}")
             for i, orf in enumerate(splitorf.pos):
-                self.data.append({'orfID':          f"{seq['id']}_{orf[0]}_{orf[1]}",
-                                  'startCodon':     seq['seq'][orf[0]:orf[0] + 3],
-                                  'stopCodon':      seq['seq'][orf[1]:orf[1] + 3],
-                                  'startCodonSite': orf[0],
-                                  'stopCodonSite':  orf[1]
-                                  })
+                self.append(DataEntry(orf_id=f"{seq['id']}_{orf[0]}_{orf[1]}",
+                                      orf_seq=seq['seq'][orf[0]:orf[1]],
+                                      source=seq['id'],
+                                      start_at=orf[0],
+                                      end_at=orf[1],
+                                      class_label=self.label
+                                      ))
 
-        return len(sequences)
+        return len(self)
 
     def orf_filter(self, label, constraints):
         """-----------------------------------------------------------------------------------------
-        return an list of ORFs object with the ORFs of interest. Constraints can be used to filter
+        return a list of ORFs object with the ORFs of interest. Constraints can be used to filter
         the list. Constraints is a dictionary. The keys correspond to the column labels and the
         values are arrays that specify allowed values. For "DNAlength" the value indicates the
         minimum acceptable length (including stop codon).
@@ -238,16 +321,16 @@ if __name__ == '__main__':
     filter_len = 30
     threshold = 0.75
 
-    # fasta = Dataset('../datasets/negative_original.fasta_test.fa', 'unknown')
+    # fasta = DataSet('../datasets/negative_original.fasta_test.fa', 'unknown')
 
-    # pos = Dataset(sys.argv[1], 'positive')
+    # pos = DataSet(sys.argv[1], 'positive')
     # sys.stderr.write(f'Positive sequences read: {len(pos.data)}\n')
     # filtered_orfs = pos.orf_filter('positive', {'DNAlength': filter_len})
     # n_pos_filt = len(filtered_orfs)
     # sys.stderr.write(f'Positive sequences after filtering ({filter_len}): {n_pos_filt}\n')
     #
-    # neg = Dataset(sys.argv[2], 'negative')
-    neg = Dataset('../datasets/negative_original_data.csv', 'negative')
+    neg = DataSet(sys.argv[2], 'negative')
+    # neg = Dataset('../datasets/negative_original_data.csv', 'negative')
     sys.stderr.write(f'Negative sequences read: {len(neg.data)}\n')
     filtered_orfs += neg.orf_filter('negative', {'DNAlength': filter_len})
     n_neg_filt = len(filtered_orfs) - n_pos_filt
